@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cutive Mono', monospace;
+  --font-mono: 'Cutive Mono', monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-zinc-300 min-h-screen antialiased overflow-hidden select-none;
+  }
+}
+
+/* Glassmorphism utility */
+.glass {
+  @apply bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-xl;
+}
+
+/* App Drag Region for Titlebar */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+}
+
+/* Elements that shouldn't drag the window */
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
