@@ -28,6 +28,17 @@ function App() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let dragCounter = 0;
+
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter++;
+      if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+        setIsDragging(true);
+      }
+    };
+
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -37,12 +48,16 @@ function App() {
     const handleDragLeave = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsDragging(false);
+      dragCounter--;
+      if (dragCounter === 0) {
+        setIsDragging(false);
+      }
     };
 
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      dragCounter = 0;
       setIsDragging(false);
       setConvertStatus('idle');
 
@@ -59,25 +74,41 @@ function App() {
         });
 
         if (window.fsAPI) {
-           const targetOptions = await window.fsAPI.getTargetFormats(fullPath, droppedFile.type, ext);
-           setFormats(targetOptions);
+           try {
+             const targetOptions = await window.fsAPI.getTargetFormats(fullPath, droppedFile.type, ext);
+             setFormats(targetOptions || []);
+             if (!targetOptions || targetOptions.length === 0) {
+               setFile({
+                 name: `Zero formats! ext="${ext}", type="${droppedFile.type}"`,
+                 path: fullPath, type: droppedFile.type, size: droppedFile.size
+               });
+             }
+           } catch (err: any) {
+             setFile({
+               name: `IPC Error: ${err.message}`,
+               path: fullPath, type: droppedFile.type, size: droppedFile.size
+             });
+           }
+        } else {
+           setFormats(['jpg', 'png']);
+           setFile({
+             name: 'Browser Mode (No window.fsAPI)',
+             path: fullPath, type: droppedFile.type, size: droppedFile.size
+           });
         }
       }
     };
 
-    const el = dropRef.current;
-    if (el) {
-      el.addEventListener('dragover', handleDragOver);
-      el.addEventListener('dragleave', handleDragLeave);
-      el.addEventListener('drop', handleDrop);
-    }
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
 
     return () => {
-      if (el) {
-        el.removeEventListener('dragover', handleDragOver);
-        el.removeEventListener('dragleave', handleDragLeave);
-        el.removeEventListener('drop', handleDrop);
-      }
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
     };
   }, []);
 
@@ -129,10 +160,10 @@ function App() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.3 }}
                 ref={dropRef}
-                className={`w-full max-w-2xl aspect-video rounded-[3rem] border-2 border-dashed flex flex-col items-center justify-center transition-all duration-300 ${
+                className={`w-full max-w-2xl aspect-video flex flex-col items-center justify-center transition-all duration-300 ${
                   isDragging
-                    ? 'border-zinc-300 bg-white/5 shadow-[0_0_40px_rgba(255,255,255,0.05)]'
-                    : 'border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/80 hover:border-zinc-600'
+                    ? 'scale-105 opacity-80'
+                    : ''
                 }`}
               >
                 <div className="p-4 bg-zinc-800/80 rounded-full mb-4 shadow-lg text-zinc-300">

@@ -1,13 +1,14 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegStatic = require('@ffmpeg-installer/ffmpeg');
-const ffprobeStatic = require('@ffprobe-installer/ffprobe');
-const sharp = require('sharp');
+const ConversionGraph = require('./core/ConversionGraph.cjs');
+const SharpHandler = require('./handlers/SharpHandler.cjs');
+const FfmpegHandler = require('./handlers/FfmpegHandler.cjs');
 
-// Set ffmpeg paths
-ffmpeg.setFfmpegPath(ffmpegStatic.path.replace('app.asar', 'app.asar.unpacked'));
-ffmpeg.setFfprobePath(ffprobeStatic.path.replace('app.asar', 'app.asar.unpacked'));
+// Initialize the universal conversion graph
+const graph = new ConversionGraph();
+graph.registerHandler(new SharpHandler());
+graph.registerHandler(new FfmpegHandler());
+
 
 let mainWindow;
 
@@ -53,24 +54,7 @@ app.on('window-all-closed', function () {
 
 ipcMain.handle('get-target-formats', async (event, filePath, mimeType, extension) => {
   const ext = extension.toLowerCase().replace('.', '');
-  
-  const imageFormats = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'tiff', 'bmp'];
-  const videoFormats = ['mp4', 'webm', 'gif', 'avi', 'mov', 'mkv'];
-  const audioFormats = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'];
-
-  if (imageFormats.includes(ext)) {
-    return imageFormats.filter(f => f !== ext);
-  }
-  
-  if (videoFormats.includes(ext)) {
-    return [...videoFormats.filter(f => f !== ext), ...audioFormats];
-  }
-
-  if (audioFormats.includes(ext)) {
-    return audioFormats.filter(f => f !== ext);
-  }
-
-  return [];
+  return graph.getReachableFormats(ext).filter(f => f !== ext);
 });
 
 ipcMain.handle('convert-file', async (event, inputPath, targetExt) => {
@@ -94,22 +78,10 @@ ipcMain.handle('convert-file', async (event, inputPath, targetExt) => {
   const inExt = parsedPath.ext.toLowerCase().replace('.', '');
 
   try {
-    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'tiff', 'bmp'].includes(targetExt);
-    const isInputImage = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'tiff', 'bmp'].includes(inExt);
-
-    if (isImage && isInputImage) {
-      await sharp(inputPath).toFile(outputPath);
-      return { success: true, outputPath };
-    }
-
-    return new Promise((resolve) => {
-      ffmpeg(inputPath)
-        .output(outputPath)
-        .on('end', () => resolve({ success: true, outputPath }))
-        .on('error', (err) => resolve({ success: false, error: err.message }))
-        .run();
-    });
+    await graph.executeConversion(inputPath, targetExt, outputPath);
+    return { success: true, outputPath };
   } catch (error) {
+    console.error('Conversion Graph Error:', error);
     return { success: false, error: error.message };
   }
 });
